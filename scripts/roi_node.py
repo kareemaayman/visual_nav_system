@@ -11,7 +11,7 @@ from visual_nav_system.msg import RoiFeatures
 bridge = CvBridge()
 pub = None
 
-roi_ratio = rospy.get_param("~roi_size", 0.4)
+roi_ratio = None # percentage of frame to use as ROI, set via ROS param
 
 
 def callback(msg):
@@ -35,7 +35,8 @@ def callback(msg):
     variance = float(np.var(roi))
 
     # gradient-based centroid proxy (STABLE signal)
-    moments = cv2.moments(roi)
+    edges = cv2.Canny(roi, 50, 150)
+    moments = cv2.moments(edges)
     if moments["m00"] != 0:
         cx = int(moments["m10"] / moments["m00"])
         cy = int(moments["m01"] / moments["m00"])
@@ -55,9 +56,10 @@ def callback(msg):
 
 
 def main():
-    global pub
+    global pub, roi_ratio
 
     rospy.init_node("roi_node")
+    roi_ratio = rospy.get_param("~roi_size", 0.4)
 
     pub = rospy.Publisher("/roi_features", RoiFeatures, queue_size=10)
     rospy.Subscriber("/camera_frames", Image, callback)

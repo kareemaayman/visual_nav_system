@@ -9,8 +9,8 @@ pub = None
 prev_x = None
 prev_y = None
 
-motion_threshold = rospy.get_param("~motion_threshold", 1.0) # smoothing factor
-
+motion_threshold = None # smoothing factor, set via ROS param
+smoothing_factor = None # smoothing factor, set via ROS param
 
 def callback(msg):
     global prev_x, prev_y, pub
@@ -27,18 +27,19 @@ def callback(msg):
     dx_raw = cx - prev_x
     dy_raw = cy - prev_y
 
-    dx = motion_threshold * dx_raw
-    dy = motion_threshold * dy_raw
-
+    dx = smoothing_factor * dx_raw
+    dy = smoothing_factor * dy_raw
     magnitude = math.sqrt(dx**2 + dy**2)
 
-    # direction logic
-    if abs(dx) > abs(dy):
-        direction = "RIGHT" if dx > 0 else "LEFT"
+    if magnitude < motion_threshold:
+        reliable = False
+        direction = "NONE"
     else:
-        direction = "DOWN" if dy > 0 else "UP"
-
-    reliable = magnitude > 1.0
+        reliable = True
+        if abs(dx) > abs(dy):
+            direction = "RIGHT" if dx > 0 else "LEFT"
+        else:
+            direction = "DOWN" if dy > 0 else "UP"
 
     msg_out = MotionData()
     msg_out.dx = dx
@@ -56,9 +57,11 @@ def callback(msg):
 
 
 def main():
-    global pub
+    global pub, motion_threshold, smoothing_factor
 
     rospy.init_node("motion_node")
+    motion_threshold = rospy.get_param("~motion_threshold", 0.5)
+    smoothing_factor = rospy.get_param("~smoothing_factor", 0.8)
 
     pub = rospy.Publisher("/motion_data", MotionData, queue_size=10)
     rospy.Subscriber("/roi_features", RoiFeatures, callback)
